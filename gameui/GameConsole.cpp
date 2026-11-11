@@ -129,6 +129,21 @@ bool CGameConsole::IsConsoleVisible()
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: returns true while the console is fading out
+//-----------------------------------------------------------------------------
+bool CGameConsole::IsConsoleClosing()
+{
+#ifndef _XBOX
+	if (!m_bInitialized)
+		return false;
+
+	return m_pConsole->IsClosing();
+#else
+	return false;
+#endif
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: activates the console after a delay
 //-----------------------------------------------------------------------------
 void CGameConsole::ActivateDelayed(float time)

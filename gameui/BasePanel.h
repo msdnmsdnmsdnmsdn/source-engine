@@ -35,6 +35,7 @@ enum
 class CMatchmakingBasePanel;
 class CBackgroundMenuButton;
 class CGameMenu;
+class CModernMenuCard;
 class CAsyncCtxOnDeviceAttached;
 
 // X360TBD: Move into a separate module when finished
@@ -331,6 +332,12 @@ private:
 	void UpdateGameMenus();
 	CGameMenu *RecursiveLoadGameMenu(KeyValues *datafile);
 
+	// modern menu cards and console open/close transitions
+	void CreateModernMenuCards();
+	void UpdateModernMenu();
+	void SetMenuShiftTarget( float flTarget, float flNow );
+	void UpdateMenuShiftAnimation( float flNow );
+
 	void StartExitingProcess();
 
 	bool IsPromptableCommand( const char *command );
@@ -356,6 +363,18 @@ private:
 	CGameMenu *m_pGameMenu;
 	bool m_bPlatformMenuInitialized;
 	int m_iGameMenuInset;
+
+	// modern menu cards
+	CModernMenuCard *m_pNewsCard;
+	CModernMenuCard *m_pPlayerCard;
+
+	// console open/close transition state
+	bool m_bConsoleVisible;
+	float m_flMenuShift;
+	float m_flMenuShiftStart;
+	float m_flMenuShiftStartTime;
+	float m_flMenuShiftTarget;
+	bool m_bMenuShiftAnimating;
 	
 	vgui::VPANEL	m_hMainMenuOverridePanel;
 

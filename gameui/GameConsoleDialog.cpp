@@ -27,6 +27,107 @@ CGameConsoleDialog::CGameConsoleDialog() : BaseClass( NULL, "GameConsole", false
 {
 	if( NeedProportional() ) SetProportional(true);
 	AddActionSignalTarget( this );
+
+	m_eFadeState = CONSOLE_FADE_NONE;
+	m_flFadeStartTime = 0.0f;
+	m_flFadeInDelay = 0.0f;
+
+	// We drive the fade ourselves so the console can coordinate with the menu.
+	DisableFadeEffect();
+	SetFadeEffectDisableOverride( true );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Shows the console and fades it in.
+//-----------------------------------------------------------------------------
+void CGameConsoleDialog::Activate()
+{
+	BaseClass::Activate();
+
+	// In the pause menu the console appears alongside the menu, so it can
+	// start fading immediately. On the main menu the cards slide out first,
+	// so wait for them to finish before fading the console in.
+	m_flFadeInDelay = GameUI().IsInLevel() ? 0.06f : 0.16f;
+	m_flFadeStartTime = engine->Time();
+	m_eFadeState = CONSOLE_FADE_IN;
+
+	SetAlpha( 0 );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Fades the console out and hides it when done.
+//-----------------------------------------------------------------------------
+void CGameConsoleDialog::Hide()
+{
+	if ( m_eFadeState == CONSOLE_FADE_OUT )
+		return;
+
+	if ( !IsVisible() || GetAlpha() <= 0 )
+	{
+		m_eFadeState = CONSOLE_FADE_NONE;
+		SetAlpha( 255 );
+		BaseClass::Hide();
+		return;
+	}
+
+	m_flFadeStartTime = engine->Time();
+	m_eFadeState = CONSOLE_FADE_OUT;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: True while the console is fading out.
+//-----------------------------------------------------------------------------
+bool CGameConsoleDialog::IsClosing() const
+{
+	return m_eFadeState == CONSOLE_FADE_OUT;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Advances the fade animation.
+//-----------------------------------------------------------------------------
+void CGameConsoleDialog::OnThink()
+{
+	BaseClass::OnThink();
+
+	float flNow = engine->Time();
+
+	if ( m_eFadeState == CONSOLE_FADE_IN )
+	{
+		const float flDuration = 0.26f;
+
+		float flT = ( flNow - m_flFadeStartTime - m_flFadeInDelay ) / flDuration;
+		if ( flT < 0.0f )
+		{
+			SetAlpha( 0 );
+			return;
+		}
+
+		if ( flT >= 1.0f )
+		{
+			SetAlpha( 255 );
+			m_eFadeState = CONSOLE_FADE_NONE;
+			return;
+		}
+
+		float flP = 1.0f - ( 1.0f - flT ) * ( 1.0f - flT ) * ( 1.0f - flT );
+		SetAlpha( (int)( 255.0f * flP ) );
+	}
+	else if ( m_eFadeState == CONSOLE_FADE_OUT )
+	{
+		const float flDuration = 0.20f;
+
+		float flT = ( flNow - m_flFadeStartTime ) / flDuration;
+		if ( flT >= 1.0f )
+		{
+			m_eFadeState = CONSOLE_FADE_NONE;
+			SetAlpha( 255 );
+			BaseClass::Hide();
+			return;
+		}
+
+		float flP = 1.0f - flT;
+		SetAlpha( (int)( 255.0f * flP * flP ) );
+	}
 }
 
 

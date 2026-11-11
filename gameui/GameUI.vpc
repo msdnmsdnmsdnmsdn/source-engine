@@ -50,6 +50,7 @@ $Project "GameUI"
 	{
 		$File	"BackgroundMenuButton.cpp"
 		$File	"BasePanel.cpp"
+		$File	"ModernMenu.cpp"
 		$File	"GameConsole.cpp"
 		$File	"GameUI_Interface.cpp"
 		$File	"LogoFile.cpp" [!$POSIX]
@@ -77,6 +78,7 @@ $Project "GameUI"
 	{
 		$File	"BackgroundMenuButton.h"
 		$File	"BasePanel.h"
+		$File	"ModernMenu.h"
 		$File	"BaseSaveGameDialog.h"
 		$File	"CDKeyEntryDialog.h"
 		$File	"ChangeGameDialog.h"

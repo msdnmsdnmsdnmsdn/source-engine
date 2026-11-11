@@ -37,6 +37,9 @@ public:
 	// returns true if the console is currently in focus
 	virtual bool IsConsoleVisible();
 
+	// returns true while the console is fading out
+	bool IsConsoleClosing();
+
 	// activates the console after a delay
 	void ActivateDelayed(float time);
 

@@ -6,6 +6,7 @@
 //===========================================================================//
 
 #include <stdio.h>
+#include <math.h>
 
 #include "threadtools.h"
 
@@ -37,6 +38,7 @@ using namespace vgui;
 #include "IGameUIFuncs.h"
 #include "LoadingDialog.h"
 #include "BackgroundMenuButton.h"
+#include "ModernMenu.h"
 #include "vgui_controls/AnimationController.h"
 #include "vgui_controls/ImagePanel.h"
 #include "vgui_controls/Label.h"
@@ -846,6 +848,15 @@ CBasePanel::CBasePanel() : Panel(NULL, "BaseGameUIPanel")
 	m_pGameLogo = NULL;
 	m_hMainMenuOverridePanel = NULL;
 
+	m_pNewsCard = NULL;
+	m_pPlayerCard = NULL;
+	m_bConsoleVisible = false;
+	m_flMenuShift = 0.0f;
+	m_flMenuShiftStart = 0.0f;
+	m_flMenuShiftStartTime = 0.0f;
+	m_flMenuShiftTarget = 0.0f;
+	m_bMenuShiftAnimating = false;
+
 	if ( SteamClient() )
 	{
 		HSteamPipe steamPipe = SteamClient()->CreateSteamPipe();
@@ -860,6 +871,7 @@ CBasePanel::CBasePanel() : Panel(NULL, "BaseGameUIPanel")
 
 	CreateGameMenu();
 	CreateGameLogo();
+	CreateModernMenuCards();
 
 	// Bonus maps menu blinks if something has been unlocked since the player last opened the menu
 	// This is saved as persistant data, and here is where we check for that
@@ -1551,6 +1563,117 @@ void CBasePanel::CreateGameLogo()
 	}
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Creates the two modern main-menu cards (news / player profile).
+//-----------------------------------------------------------------------------
+void CBasePanel::CreateModernMenuCards()
+{
+	// The modern cards are a PC-only presentation; the console UI keeps its
+	// existing layout.
+	if ( GameUI().IsConsoleUI() )
+	{
+		m_pNewsCard = NULL;
+		m_pPlayerCard = NULL;
+		return;
+	}
+
+	m_pNewsCard = new CModernMenuCard( this, "ModernNewsCard" );
+	SETUP_PANEL( m_pNewsCard );
+	m_pNewsCard->SetCardTitle( "NEWS" );
+	m_pNewsCard->SetCardSubtitle( "LATEST UPDATE" );
+	m_pNewsCard->SetBodyLine( 0, "Operation Riptide is live" );
+	m_pNewsCard->SetBodyLine( 1, "New map: de_grail" );
+	m_pNewsCard->SetBodyLine( 2, "[ VIEW ]" );
+	m_pNewsCard->SnapTo( false );
+
+	m_pPlayerCard = new CModernMenuCard( this, "ModernPlayerCard" );
+	SETUP_PANEL( m_pPlayerCard );
+	m_pPlayerCard->SetCardTitle( "PLAYER" );
+	m_pPlayerCard->SetCardSubtitle( "PROFILE" );
+	m_pPlayerCard->SetBodyLine( 0, "PlayerName" );
+	m_pPlayerCard->SetBodyLine( 1, "Level 42" );
+	m_pPlayerCard->SetBodyLine( 2, "128h played" );
+	m_pPlayerCard->SnapTo( false );
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Starts moving the menu to/from the left edge.
+//-----------------------------------------------------------------------------
+void CBasePanel::SetMenuShiftTarget( float flTarget, float flNow )
+{
+	if ( fabs( m_flMenuShiftTarget - flTarget ) < 0.001f )
+		return;
+
+	m_flMenuShiftStart = m_flMenuShift;
+	m_flMenuShiftStartTime = flNow;
+	m_flMenuShiftTarget = flTarget;
+	m_bMenuShiftAnimating = true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Advances the menu shift animation.
+//-----------------------------------------------------------------------------
+void CBasePanel::UpdateMenuShiftAnimation( float flNow )
+{
+	if ( !m_bMenuShiftAnimating )
+		return;
+
+	const float flDuration = 0.28f;
+
+	float flT = ( flNow - m_flMenuShiftStartTime ) / flDuration;
+	if ( flT >= 1.0f )
+	{
+		m_flMenuShift = m_flMenuShiftTarget;
+		m_bMenuShiftAnimating = false;
+	}
+	else if ( flT > 0.0f )
+	{
+		float flP = 1.0f - ( 1.0f - flT ) * ( 1.0f - flT ) * ( 1.0f - flT );
+		m_flMenuShift = m_flMenuShiftStart + ( m_flMenuShiftTarget - m_flMenuShiftStart ) * flP;
+	}
+
+	InvalidateLayout();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Drives the modern menu transitions from the console visibility.
+//-----------------------------------------------------------------------------
+void CBasePanel::UpdateModernMenu()
+{
+	if ( !m_pNewsCard || !m_pPlayerCard )
+		return;
+
+	bool bInLevel = GameUI().IsInLevel();
+	bool bConsoleVisible = GameConsole().IsConsoleVisible();
+	bool bConsoleOpen = bConsoleVisible && !GameConsole().IsConsoleClosing();
+	float flNow = engine->Time();
+
+	if ( bConsoleVisible != m_bConsoleVisible )
+	{
+		m_bConsoleVisible = bConsoleVisible;
+
+		if ( !bInLevel )
+		{
+			// Main menu: cards leave first, the console fades in afterwards
+			// (the console dialog owns its own fade timing).
+			if ( bConsoleVisible )
+			{
+				m_pNewsCard->AnimateTo( false, flNow, 0.16f, 0.0f );
+				m_pPlayerCard->AnimateTo( false, flNow, 0.16f, 0.04f );
+			}
+			else
+			{
+				m_pNewsCard->AnimateTo( true, flNow, 0.18f, 0.02f );
+				m_pPlayerCard->AnimateTo( true, flNow, 0.18f, 0.06f );
+			}
+		}
+	}
+
+	// Pause menu: slide the menu to the left while the console is open.
+	SetMenuShiftTarget( ( bInLevel && bConsoleOpen ) ? 1.0f : 0.0f, flNow );
+	UpdateMenuShiftAnimation( flNow );
+}
+
 void CBasePanel::CheckBonusBlinkState()
 {
 #ifdef _X360
@@ -1681,6 +1804,8 @@ void CBasePanel::RunFrame()
 
 	UpdateBackgroundState();
 
+	UpdateModernMenu();
+
 	if ( !m_bPlatformMenuInitialized )
 	{
 		// check to see if the platform is ready to load yet
@@ -1767,6 +1892,24 @@ void CBasePanel::PerformLayout()
 
 	int yDiff = idealMenuY - m_iGameMenuPos.y;
 
+	// Pause menu: shift the whole menu toward the left edge while the
+	// console is open.
+	int iShiftDelta = 0;
+	int iMenuX = m_iGameMenuPos.x;
+	if ( m_flMenuShift > 0.001f )
+	{
+		// Move the menu left by a fixed distance, clamped to the left edge.
+		int iShiftTargetX = m_iGameMenuPos.x - scheme()->GetProportionalScaledValue( 160 );
+		int iMinX = scheme()->GetProportionalScaledValue( 24 );
+		if ( iShiftTargetX < iMinX )
+		{
+			iShiftTargetX = iMinX;
+		}
+
+		iMenuX = m_iGameMenuPos.x + (int)( ( iShiftTargetX - m_iGameMenuPos.x ) * m_flMenuShift );
+		iShiftDelta = iMenuX - m_iGameMenuPos.x;
+	}
+
 	for ( int i=0; i<m_pGameMenuButtons.Count(); ++i )
 	{
 		// Get the size of the logo text
@@ -1775,14 +1918,14 @@ void CBasePanel::PerformLayout()
 		//vgui::surface()->GetTextSize( m_pGameMenuButtons[i]->GetFont(), ModInfo().GetGameTitle(), textWide, textTall );
 
 		// place menu buttons above middle of screen
-		m_pGameMenuButtons[i]->SetPos(m_iGameTitlePos[i].x, m_iGameTitlePos[i].y + yDiff);
+		m_pGameMenuButtons[i]->SetPos(m_iGameTitlePos[i].x + iShiftDelta, m_iGameTitlePos[i].y + yDiff);
 		//m_pGameMenuButtons[i]->SetSize(textWide + 4, textTall + 4);
 	}
 
 	if ( m_pGameLogo )
 	{
 		// move the logo to sit right on top of the menu
-		m_pGameLogo->SetPos( m_iGameMenuPos.x + m_pGameLogo->GetOffsetX(), idealMenuY - m_pGameLogo->GetTall() + m_pGameLogo->GetOffsetY() );
+		m_pGameLogo->SetPos( m_iGameMenuPos.x + iShiftDelta + m_pGameLogo->GetOffsetX(), idealMenuY - m_pGameLogo->GetTall() + m_pGameLogo->GetOffsetY() );
 	}
 
 	// position self along middle of screen
@@ -1792,7 +1935,32 @@ void CBasePanel::PerformLayout()
 		m_pGameMenu->GetPos( posx, posy );
 		m_iGameMenuPos.x = posx;
 	}
-	m_pGameMenu->SetPos(m_iGameMenuPos.x, idealMenuY);
+	m_pGameMenu->SetPos(iMenuX, idealMenuY);
+
+	// Modern main-menu cards, anchored to the right side of the screen.
+	if ( m_pNewsCard && m_pPlayerCard )
+	{
+		int iCardWide = scheme()->GetProportionalScaledValue( 360 );
+		int iCardTall = scheme()->GetProportionalScaledValue( 132 );
+		int iMargin = scheme()->GetProportionalScaledValue( 48 );
+		int iGap = scheme()->GetProportionalScaledValue( 16 );
+		int iCardX = wide - iCardWide - iMargin;
+		int iNewsY = (int)( tall * 0.34f );
+		int iPlayerY = iNewsY + iCardTall + iGap;
+
+		m_pNewsCard->SetSize( iCardWide, iCardTall );
+		m_pNewsCard->SetBasePos( iCardX, iNewsY );
+
+		m_pPlayerCard->SetSize( iCardWide, iCardTall );
+		m_pPlayerCard->SetBasePos( iCardX, iPlayerY );
+
+		// Cards only belong to the main menu, never to the pause menu.
+		if ( GameUI().IsInLevel() )
+		{
+			m_pNewsCard->SnapTo( false );
+			m_pPlayerCard->SnapTo( false );
+		}
+	}
 
 	UpdateGameMenus();
 }
@@ -1949,6 +2117,22 @@ void CBasePanel::OnGameUIActivated()
 		// Don't display this again until it happens again
 		engine->SetMapLoadFailed( false );
 		ShowMessageDialog( MD_LOAD_FAILED_WARNING );
+	}
+
+	// Modern main-menu cards animate in with the main menu.
+	if ( m_pNewsCard && m_pPlayerCard )
+	{
+		if ( !GameUI().IsInLevel() && !GameConsole().IsConsoleVisible() )
+		{
+			float flNow = engine->Time();
+			m_pNewsCard->AnimateTo( true, flNow, 0.22f, 0.05f );
+			m_pPlayerCard->AnimateTo( true, flNow, 0.22f, 0.09f );
+		}
+		else
+		{
+			m_pNewsCard->SnapTo( false );
+			m_pPlayerCard->SnapTo( false );
+		}
 	}
 
 

@@ -28,12 +28,31 @@ class CGameConsoleDialog : public vgui::CConsoleDialog
 public:
 	CGameConsoleDialog();
 
+	// Fade the console in when it is activated and out before hiding it.
+	virtual void Activate();
+	virtual void Hide();
+
+	// True while the console is fading out.
+	bool IsClosing() const;
+
 private:
+	enum ConsoleFadeState_t
+	{
+		CONSOLE_FADE_NONE = 0,
+		CONSOLE_FADE_IN,
+		CONSOLE_FADE_OUT,
+	};
+
 	MESSAGE_FUNC( OnClosedByHittingTilde, "ClosedByHittingTilde" );
 	MESSAGE_FUNC_CHARPTR( OnCommandSubmitted, "CommandSubmitted", command );
 
 	virtual void OnKeyCodeTyped( vgui::KeyCode code );
 	virtual void OnCommand( const char *command );
+	virtual void OnThink();
+
+	ConsoleFadeState_t m_eFadeState;
+	float m_flFadeStartTime;
+	float m_flFadeInDelay;
 };
 
 

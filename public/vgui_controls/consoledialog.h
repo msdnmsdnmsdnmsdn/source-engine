@@ -151,7 +151,7 @@ public:
 	MESSAGE_FUNC_CHARPTR( OnCommandSubmitted, "CommandSubmitted", command );
 
 	// hides the console
-	void Hide();
+	virtual void Hide();
 
 	// Chain to the page
 	void Print( const char *msg );
