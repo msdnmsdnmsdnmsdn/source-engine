@@ -136,6 +136,9 @@ void CGameConsoleDialog::OnThink()
 //-----------------------------------------------------------------------------
 void CGameConsoleDialog::OnCommand(const char *command)
 {
+	if ( !command )
+		return;
+
 	if ( !Q_stricmp( command, "Close" ) )
 	{
 		if ( GameUI().IsInBackgroundLevel() )
@@ -182,6 +185,9 @@ void CGameConsoleDialog::OnKeyCodeTyped(KeyCode code)
 //-----------------------------------------------------------------------------
 void CGameConsoleDialog::OnCommandSubmitted( const char *pCommand )
 {
+	if ( !pCommand || !pCommand[0] )
+		return;
+
 	engine->ClientCmd_Unrestricted( pCommand );
 }
 

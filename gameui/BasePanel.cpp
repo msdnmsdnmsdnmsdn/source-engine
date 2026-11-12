@@ -456,6 +456,8 @@ public:
 	{
 		m_KeyRepeat.Reset();
 
+		if ( !command )
+			return;
 
 		if (!stricmp(command, "Open"))
 		{
@@ -2217,6 +2219,9 @@ void CBasePanel::OnGameUIActivated()
 //-----------------------------------------------------------------------------
 void CBasePanel::RunMenuCommand(const char *command)
 {
+	if ( !command )
+		return;
+
 	if ( !Q_stricmp( command, "OpenGameMenu" ) )
 	{
 		if ( m_pGameMenu )
@@ -3039,6 +3044,9 @@ void CBasePanel::IssuePostPromptCommand( void )
 //-----------------------------------------------------------------------------
 void CBasePanel::OnCommand( const char *command )
 {
+	if ( !command )
+		return;
+
 	if ( GameUI().IsConsoleUI() )
 	{
 #if defined( _X360 )
